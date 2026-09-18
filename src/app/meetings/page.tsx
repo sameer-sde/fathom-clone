@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import SearchBar from "./search-bar";
 
+export const dynamic = "force-dynamic";
+
 function formatDuration(seconds: number | null) {
   if (!seconds) return "—";
   const mins = Math.floor(seconds / 60);
