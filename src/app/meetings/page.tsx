@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import SearchBar from "./search-bar";
 
 function formatDuration(seconds: number | null) {
   if (!seconds) return "—";
@@ -38,6 +39,7 @@ export default async function MeetingsPage() {
       <header className="border-b border-neutral-800 px-6 py-4">
         <div className="mx-auto flex max-w-5xl items-center justify-between">
           <h1 className="text-lg font-semibold">Meetings</h1>
+          <SearchBar />
           <form action="/auth/signout" method="post">
             <button className="text-sm text-neutral-400 hover:text-white">
               Sign out
@@ -79,7 +81,7 @@ export default async function MeetingsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="rounded-full bg-neutral-800 px-2.5 py-1 text-xs capitalize text-neutral-300">
-                    {m.meeting_type.replace("_", " ")}
+                    {m.meeting_type.replace(/_/g, " ")}
                   </span>
                   <span className="text-sm text-neutral-500">
                     {formatDuration(m.duration_seconds)}
