@@ -30,8 +30,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/meetings");
-    router.refresh();
+    window.location.href = "/meetings";
   }
 
   return (
