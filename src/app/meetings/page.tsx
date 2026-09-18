@@ -34,6 +34,7 @@ export default async function MeetingsPage() {
   const { data: meetings, error } = await supabase
     .from("meetings")
     .select("id, title, meeting_type, started_at, duration_seconds, participant_count, status")
+    .eq("user_id", userData.user.id)
     .order("started_at", { ascending: false });
 
   return (
