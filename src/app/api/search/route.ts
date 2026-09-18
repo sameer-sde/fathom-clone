@@ -20,11 +20,13 @@ export async function GET(request: Request) {
     supabase
       .from("meetings")
       .select("id, title, started_at, meeting_type")
+      .eq("user_id", userData.user.id)
       .ilike("title", `%${q}%`)
       .order("started_at", { ascending: false }),
     supabase
       .from("transcript_lines")
-      .select("id, meeting_id, text, start_seconds, meetings(title)")
+      .select("id, meeting_id, text, start_seconds, meetings!inner(title, user_id)")
+      .eq("meetings.user_id", userData.user.id)
       .ilike("text", `%${q}%`)
       .limit(20),
   ]);

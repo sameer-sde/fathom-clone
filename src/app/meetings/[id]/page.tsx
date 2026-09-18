@@ -21,6 +21,7 @@ export default async function MeetingDetailPage({
     .from("meetings")
     .select("*")
     .eq("id", id)
+    .eq("user_id", userData.user.id)
     .single();
 
   if (meetingError || !meeting) {
