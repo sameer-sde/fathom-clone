@@ -18,6 +18,9 @@ export default function LoginPage() {
     setLoading(true);
     const supabase = createClient();
 
+    // Clear any lingering client-side session before starting a new one
+    await supabase.auth.signOut();
+
     const { error } =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
