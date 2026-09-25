@@ -1,6 +1,6 @@
-# Fathom Clone
+# Followthrough
 
-A from-scratch rebuild of [Fathom](https://fathom.video) — the AI meeting notetaker — built in a single day for the 8x Hiring take-home assignment.
+An AI meeting notetaker organised around **who committed to what**. It started as a from-scratch rebuild of [Fathom](https://fathom.video) for the 8x Hiring take-home; round two keeps the same backend and replaces the cloned interface with my own design.
 
 **Live app:** https://fathom-clone-one.vercel.app
 **Repository:** https://github.com/sameer-sde/fathom-clone
@@ -10,6 +10,7 @@ A from-scratch rebuild of [Fathom](https://fathom.video) — the AI meeting note
 ## Contents
 
 - [What this is](#what-this-is)
+- [Design: why commitments come first](#design-why-commitments-come-first)
 - [Features](#features)
 - [A real bug we found and fixed](#a-real-bug-we-found-and-fixed)
 - [Deliberate scope decisions](#deliberate-scope-decisions)
@@ -28,6 +29,16 @@ Fathom records meetings, transcribes them, and turns that transcript into someth
 
 It does not attempt to build a working meeting-recording bot; the brief explicitly allows stubbing that layer, and doing so freed up time for the parts that are actually hard to get right: keeping playback and transcript in sync, letting a summary jump you to the right moment, making search actually search transcript content (not just titles), and making sharing work for someone who was never signed in.
 
+## Design: why commitments come first
+
+When I tested the real Fathom, what I wanted after a call wasn't the recording or even the summary. It was the list of promises: who said they'd do what, and proof that they said it. So the interface is built around that list instead of around the video.
+
+- **Home is "Still owed", not a list of recordings.** Open commitments from every meeting, grouped by person, sit next to the meeting library. You can check things off without opening a meeting.
+- **Each meeting opens on "Who owes what".** Commitments are grouped by owner, can be checked off or reassigned, and link to the exact moment they were said. The summary comes second.
+- **The transcript is the evidence.** It stays pinned beside everything else, follows playback, and tags the lines where a commitment was made.
+- **The scrubber shows the conversation.** Each speaker's turns are drawn in their colour along the timeline, with markers for commitments and highlights, so an 8-person call is readable at a glance.
+- **Visual language: a paper ledger.** Warm paper, ink text, a serif for headings, monospace timestamps that read like citations, and a single signal colour (burnt orange) that only ever means "still owed". Works in light and dark mode and down to phone width.
+
 ## Features
 
 | Feature | Notes |
@@ -35,8 +46,10 @@ It does not attempt to build a working meeting-recording bot; the brief explicit
 | Auth | Email/password via Supabase Auth |
 | Meetings list | Seeded with a 2-minute 1:1, a 12-minute sales call, and a 1-hour / 8-person all-hands — the case the brief says "actually matters" |
 | Playback + synced transcript | Simulated timeline (no real video file — see Deliberate scope decisions), scrubbable, click any transcript line to seek, current line highlights as playback progresses |
-| AI summary panel | Multiple templates per meeting (General, Sales Call), each bullet links to the timestamp it came from |
-| Action items | Extracted per meeting, checkable in the UI, each links back to its timestamp |
+| AI summary panel | Multiple templates per meeting (General, Sales Call), each bullet links to the timestamp it came from; missing templates can be generated on demand |
+| Commitments | Extracted per meeting with an owner. Checking off and reassigning persist via `PATCH /api/action-items/[id]`, and each links back to its timestamp |
+| Still owed | Cross-meeting view of every open commitment, grouped by person |
+| Live AI summary | `POST /api/meetings/[id]/summary` sends the transcript to Claude, saves the summary and re-extracts open commitments with owners (done items are kept) |
 | Highlights | Marked moments shown on the progress bar and in a sidebar list, click to jump |
 | Cross-meeting search | Matches both meeting titles and transcript text, live dropdown with excerpts |
 | Public sharing | "Share clip" generates a public, no-login-required link scoped to exactly one meeting |
@@ -50,7 +63,7 @@ Fix: defense-in-depth. The meetings list, meeting detail page, and search API no
 ## Deliberate scope decisions
 
 - Capture layer is stubbed. No real Zoom/Meet/Teams bot. Playback is a timer-driven progress bar synced against a real, seeded transcript. The interaction (scrub, seek, jump-from-summary) is fully real; only the recording itself is simulated. The brief explicitly permits this.
-- Summaries are hand-written, not live-generated. The Anthropic Console account used for this build had no API credits available mid-build. `scripts/seed.ts` is structured so a real `anthropic.messages.create()` call is a small, contained swap. See `scripts/summaries-data.ts` for where the hand-written content currently sits. The summaries still follow the correct per-template structure (General vs. Sales Call) and are grounded in the actual seeded transcripts.
+- Seeded summaries are hand-written. The Anthropic account had no API credits during the first build, so `scripts/summaries-data.ts` holds grounded, hand-written summaries for the demo data. Live generation now exists (`POST /api/meetings/[id]/summary`, "Regenerate with AI" in the UI) and works whenever `ANTHROPIC_API_KEY` has credits; if it fails, the UI shows the error and keeps the existing summary.
 - No calendar integration. Out of scope given the time budget.
 
 ## Tech stack
@@ -70,9 +83,13 @@ src/
     meetings/[id]/          meeting detail: playback, transcript, summary, actions, highlights
     share/[token]/          public, no-auth share page
     api/
+      action-items/[id]/    PATCH: complete / reassign a commitment
       meetings/[id]/share/  creates a shared_clips row
+      meetings/[id]/summary/ POST: live AI summary + commitment extraction
       search/               cross-meeting + transcript search
     auth/signout/           sign-out route handler
+  components/               shared UI: header, avatars, timestamp chips, checkbox
+  lib/meeting.ts            shared types + formatting helpers
   lib/supabase/             browser / server / admin Supabase clients
   proxy.ts                  Next.js 16 middleware equivalent, refreshes auth session
 scripts/
@@ -93,7 +110,9 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Apply the schema by running each file in `supabase/migrations/`, in order, via the Supabase SQL Editor.
+Apply the schema by running each file in `supabase/migrations/`, in order, via the Supabase SQL Editor. `004_action_item_owners.sql` adds commitment owners and backfills existing rows (a name prefix like "Priya: …" wins, otherwise whoever was speaking at that moment).
+
+Optional: set `ANTHROPIC_MODEL` to override the model used for live summaries.
 
 ## Seeding demo data
 
@@ -107,7 +126,7 @@ This inserts the three demo meetings (with transcripts, summaries, action items,
 
 ## Database schema
 
-Seven tables: `meetings`, `meeting_participants`, `transcript_lines`, `summaries`, `action_items`, `highlights`, `shared_clips`, all with Row Level Security enabled. Owners can do anything with their own rows; a valid `shared_clips` entry additionally grants read-only public access to that one meeting's data. See `supabase/migrations/001_initial_schema.sql` for the full definitions and `002`/`003` for the RLS fixes described above.
+Seven tables (`action_items` gains `owner_participant_id` and `completed_at` in migration 004): `meetings`, `meeting_participants`, `transcript_lines`, `summaries`, `action_items`, `highlights`, `shared_clips`, all with Row Level Security enabled. Owners can do anything with their own rows; a valid `shared_clips` entry additionally grants read-only public access to that one meeting's data. See `supabase/migrations/001_initial_schema.sql` for the full definitions and `002`/`003` for the RLS fixes described above.
 
 ## Agent capture logs
 

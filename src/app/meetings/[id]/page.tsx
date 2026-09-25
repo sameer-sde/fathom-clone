@@ -1,15 +1,19 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import AppHeader from "@/components/app-header";
 import MeetingDetailClient from "./meeting-detail-client";
 
 export const dynamic = "force-dynamic";
 
 export default async function MeetingDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ t?: string }>;
 }) {
   const { id } = await params;
+  const { t } = await searchParams;
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
 
@@ -37,14 +41,23 @@ export default async function MeetingDetailPage({
       supabase.from("highlights").select("*").eq("meeting_id", id).order("timestamp_seconds"),
     ]);
 
+  const startAt = Number(t);
+
   return (
-    <MeetingDetailClient
-      meeting={meeting}
-      participants={participants ?? []}
-      transcript={transcript ?? []}
-      summaries={summaries ?? []}
-      actionItems={actionItems ?? []}
-      highlights={highlights ?? []}
-    />
+    <div className="min-h-screen">
+      <AppHeader email={userData.user.email} />
+      <MeetingDetailClient
+        meeting={meeting}
+        participants={(participants ?? []).sort((a, b) => Number(b.is_host) - Number(a.is_host))}
+        transcript={(transcript ?? []).map((l) => ({ ...l, start_seconds: Number(l.start_seconds) }))}
+        summaries={summaries ?? []}
+        actionItems={(actionItems ?? []).map((a) => ({
+          ...a,
+          timestamp_seconds: a.timestamp_seconds == null ? null : Number(a.timestamp_seconds),
+        }))}
+        highlights={(highlights ?? []).map((h) => ({ ...h, timestamp_seconds: Number(h.timestamp_seconds) }))}
+        initialTime={Number.isFinite(startAt) && startAt > 0 ? startAt : 0}
+      />
+    </div>
   );
 }

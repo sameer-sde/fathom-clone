@@ -1,4 +1,3 @@
--- Fixes infinite recursion between meetings and shared_clips RLS policies
 drop policy if exists "Anyone can view meeting data behind a valid shared clip" on meetings;
 drop policy if exists "Anyone can view transcript behind a valid shared clip" on transcript_lines;
 

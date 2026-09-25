@@ -100,6 +100,19 @@ const MEETINGS: {
   },
 ];
 
+function guessOwner(
+  item: { text: string; timestamp_seconds: number },
+  m: (typeof MEETINGS)[number],
+  participantIds: Record<string, string>
+): string | null {
+  const byPrefix = m.participants.find((name) =>
+    item.text.toLowerCase().startsWith(name.split(" ")[0].toLowerCase())
+  );
+  if (byPrefix) return participantIds[byPrefix] ?? null;
+  const speaking = [...m.transcript].reverse().find((l) => l.start <= item.timestamp_seconds);
+  return speaking ? participantIds[speaking.speaker] ?? null : null;
+}
+
 async function main() {
   const { data: users, error: userErr } = await admin.auth.admin.listUsers();
   if (userErr) throw userErr;
@@ -180,6 +193,7 @@ async function main() {
           text: it.text,
           timestamp_seconds: it.timestamp_seconds,
           sequence: i,
+          owner_participant_id: guessOwner(it, m, participantIds),
         }))
       );
       if (aErr) throw aErr;
