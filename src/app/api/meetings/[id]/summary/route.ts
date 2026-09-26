@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
@@ -20,6 +19,38 @@ function fmt(s: number) {
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 }
 
+const MODELS = [
+  process.env.GROQ_MODEL,
+  "openai/gpt-oss-120b",
+  "llama-3.3-70b-versatile",
+  "openai/gpt-oss-20b",
+  "llama-3.1-8b-instant",
+].filter((m): m is string => Boolean(m));
+
+async function callGroq(prompt: string) {
+  let lastError = "";
+  for (const model of MODELS) {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        max_tokens: 4000,
+        response_format: { type: "json_object" },
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return (data.choices?.[0]?.message?.content ?? "") as string;
+    }
+    lastError = `Groq ${res.status} (${model}): ${await res.text()}`;
+    if (res.status !== 404 && res.status !== 400) break;
+  }
+  throw new Error(lastError);
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -28,8 +59,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "AI summaries aren't configured on this deployment (missing ANTHROPIC_API_KEY)." }, { status: 503 });
+  if (!process.env.GROQ_API_KEY) {
+    return NextResponse.json({ error: "AI summaries aren't set up on this deployment yet." }, { status: 503 });
   }
 
   const { template = "general" } = (await request.json().catch(() => ({}))) as { template?: string };
@@ -80,19 +111,13 @@ Rules:
 
   let generated: Generated;
   try {
-    const anthropic = new Anthropic();
-    const response = await anthropic.messages.create({
-      model: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5",
-      max_tokens: 4000,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const text = response.content.map((b) => (b.type === "text" ? b.text : "")).join("");
+    const text = await callGroq(prompt);
     const json = text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1);
     generated = JSON.parse(json);
     if (!Array.isArray(generated.sections) || !Array.isArray(generated.action_items)) throw new Error("bad shape");
   } catch (e) {
-    const message = e instanceof Error ? e.message : "unknown error";
-    return NextResponse.json({ error: `Couldn't generate a summary: ${message}` }, { status: 502 });
+    console.error("summary generation failed", e);
+    return NextResponse.json({ error: "Couldn't generate a summary right now. Please try again in a moment." }, { status: 502 });
   }
 
   const { data: summary, error: sErr } = await supabase

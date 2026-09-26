@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import LocalTime from "@/components/local-time";
 import { Avatar, Eyebrow, TimeChip, Wordmark } from "@/components/ui";
 import { formatDuration, formatTime, labelForType } from "@/lib/meeting";
 
@@ -35,7 +36,6 @@ export default async function SharePage({
 
   const participantMap = new Map((participants ?? []).map((p) => [p.id, p]));
   const summary = summaries?.[0];
-  const when = new Date(meeting.started_at);
 
   return (
     <div className="min-h-screen">
@@ -51,7 +51,7 @@ export default async function SharePage({
       <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
         <Eyebrow>
           {labelForType(meeting.meeting_type)} ·{" "}
-          {when.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })} ·{" "}
+          <LocalTime iso={meeting.started_at} kind="long" /> ·{" "}
           {formatDuration(meeting.duration_seconds)}
         </Eyebrow>
         <h1 className="mt-2 font-serif text-[36px] leading-[1.1] tracking-tight sm:text-[44px]">{meeting.title}</h1>

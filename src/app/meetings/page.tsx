@@ -4,18 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import AppHeader from "@/components/app-header";
 import { Avatar, Eyebrow } from "@/components/ui";
 import { formatDuration, labelForType, resolveOwnerId, type Participant } from "@/lib/meeting";
+import LocalTime from "@/components/local-time";
 import OwedList, { type OwedItem } from "./owed-list";
 
 export const dynamic = "force-dynamic";
-
-function dayLabel(date: Date) {
-  const today = new Date();
-  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-  const diff = Math.round((startOf(today) - startOf(date)) / 86_400_000);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Yesterday";
-  return date.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
-}
 
 export default async function MeetingsPage() {
   const supabase = await createClient();
@@ -74,7 +66,7 @@ export default async function MeetingsPage() {
 
   const groups: { label: string; rows: NonNullable<typeof meetings> }[] = [];
   for (const m of meetings ?? []) {
-    const label = dayLabel(new Date(m.started_at));
+    const label = m.started_at.slice(0, 10);
     const g = groups.at(-1);
     if (g && g.label === label) g.rows.push(m);
     else groups.push({ label, rows: [m] });
@@ -115,7 +107,9 @@ export default async function MeetingsPage() {
 
           {groups.map((g) => (
             <div key={g.label} className="mt-8">
-              <Eyebrow>{g.label}</Eyebrow>
+              <Eyebrow>
+                <LocalTime iso={g.rows[0].started_at} kind="day" />
+              </Eyebrow>
               <ul className="mt-2 divide-y divide-rule border-y border-rule">
                 {g.rows.map((m) => {
                   const people = peopleByMeeting.get(m.id) ?? [];
@@ -127,7 +121,7 @@ export default async function MeetingsPage() {
                         className="group grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-2 px-1 py-4 transition hover:bg-sunk sm:grid-cols-[4.5rem_1fr_auto] sm:px-3"
                       >
                         <span className="hidden font-mono text-xs text-muted sm:block">
-                          {new Date(m.started_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                          <LocalTime iso={m.started_at} kind="time" />
                         </span>
                         <span className="min-w-0">
                           <span className="block truncate font-serif text-[19px] leading-snug text-ink group-hover:underline group-hover:decoration-rule-strong group-hover:underline-offset-4">

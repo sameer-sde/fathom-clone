@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import LocalTime from "@/components/local-time";
 import Check, { patchActionItem } from "@/components/checkbox";
 import { Avatar, Eyebrow, TimeChip } from "@/components/ui";
 import {
@@ -218,7 +219,6 @@ export default function MeetingDetailClient({
   const currentLine = currentLineIndex >= 0 ? transcript[currentLineIndex] : null;
   const currentSpeaker = currentLine?.participant_id ? participantMap.get(currentLine.participant_id) : null;
   const pct = (s: number) => `${(Math.min(s, duration) / duration) * 100}%`;
-  const when = new Date(meeting.started_at);
 
   return (
     <>
@@ -230,8 +230,8 @@ export default function MeetingDetailClient({
           <div className="min-w-0">
             <Eyebrow>
               {labelForType(meeting.meeting_type)} ·{" "}
-              {when.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} ·{" "}
-              {when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · {formatDuration(meeting.duration_seconds)}
+              <LocalTime iso={meeting.started_at} kind="date" /> · <LocalTime iso={meeting.started_at} kind="time" /> ·{" "}
+              {formatDuration(meeting.duration_seconds)}
             </Eyebrow>
             <h1 className="mt-2 font-serif text-[34px] leading-[1.1] tracking-tight sm:text-[42px]">{meeting.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -532,7 +532,9 @@ export default function MeetingDetailClient({
                 <div className="mt-4 flex items-center justify-between gap-3">
                   <p className="text-[12px] text-muted">
                     {activeSummary.generated_at &&
-                      `Generated ${new Date(activeSummary.generated_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}
+                      <>
+                        Generated <LocalTime iso={activeSummary.generated_at} kind="stamp" />
+                      </>}
                   </p>
                   <button
                     onClick={() => generate(activeTemplate)}

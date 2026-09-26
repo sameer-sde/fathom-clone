@@ -49,7 +49,7 @@ When I tested the real Fathom, what I wanted after a call wasn't the recording o
 | AI summary panel | Multiple templates per meeting (General, Sales Call), each bullet links to the timestamp it came from; missing templates can be generated on demand |
 | Commitments | Extracted per meeting with an owner. Checking off and reassigning persist via `PATCH /api/action-items/[id]`, and each links back to its timestamp |
 | Still owed | Cross-meeting view of every open commitment, grouped by person |
-| Live AI summary | `POST /api/meetings/[id]/summary` sends the transcript to Claude, saves the summary and re-extracts open commitments with owners (done items are kept) |
+| Live AI summary | `POST /api/meetings/[id]/summary` sends the transcript to an LLM on Groq, saves the summary and re-extracts open commitments with owners (done items are kept) |
 | Highlights | Marked moments shown on the progress bar and in a sidebar list, click to jump |
 | Cross-meeting search | Matches both meeting titles and transcript text, live dropdown with excerpts |
 | Public sharing | "Share clip" generates a public, no-login-required link scoped to exactly one meeting |
@@ -63,7 +63,7 @@ Fix: defense-in-depth. The meetings list, meeting detail page, and search API no
 ## Deliberate scope decisions
 
 - Capture layer is stubbed. No real Zoom/Meet/Teams bot. Playback is a timer-driven progress bar synced against a real, seeded transcript. The interaction (scrub, seek, jump-from-summary) is fully real; only the recording itself is simulated. The brief explicitly permits this.
-- Seeded summaries are hand-written. The Anthropic account had no API credits during the first build, so `scripts/summaries-data.ts` holds grounded, hand-written summaries for the demo data. Live generation now exists (`POST /api/meetings/[id]/summary`, "Regenerate with AI" in the UI) and works whenever `ANTHROPIC_API_KEY` has credits; if it fails, the UI shows the error and keeps the existing summary.
+- Seeded summaries are hand-written. The demo data ships with grounded, hand-written summaries in `scripts/summaries-data.ts`. Live generation (`POST /api/meetings/[id]/summary`, "Regenerate with AI" in the UI) runs on Groq (first available of `openai/gpt-oss-120b`, `llama-3.3-70b-versatile` and smaller fallbacks) and replaces them on demand; if generation fails, the UI shows a short message and keeps the existing summary.
 - No calendar integration. Out of scope given the time budget.
 
 ## Tech stack
@@ -106,13 +106,13 @@ git clone https://github.com/sameer-sde/fathom-clone.git
 cd fathom-clone
 npm install
 cp .env.example .env.local
-# fill in .env.local: your own Supabase project URL + keys, and an Anthropic API key
+# fill in .env.local: your own Supabase project URL + keys, and a Groq API key
 npm run dev
 ```
 
 Apply the schema by running each file in `supabase/migrations/`, in order, via the Supabase SQL Editor. `004_action_item_owners.sql` adds commitment owners and backfills existing rows (a name prefix like "Priya: …" wins, otherwise whoever was speaking at that moment).
 
-Optional: set `ANTHROPIC_MODEL` to override the model used for live summaries.
+Live AI summaries need `GROQ_API_KEY` (free at console.groq.com). Optional: `GROQ_MODEL` pins a specific model.
 
 ## Seeding demo data
 
